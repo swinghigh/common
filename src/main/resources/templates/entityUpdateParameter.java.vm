@@ -1,0 +1,88 @@
+#set($parameterPackage=$package.Entity.replace("entity","params"))
+#set($parameter="UpdateParam")
+#set($parameterParam=$package.Controller.replace("controller","params.BaseMerchantParam"))
+package ${parameterPackage};
+
+#if(${entityLombokModel})
+import ${parameterParam};
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import io.swagger.annotations.ApiModelProperty;
+import javax.validation.constraints.NotNull;
+import java.util.Date;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+#end
+
+/**
+ * <p>
+ * $!{table.comment} [修改Parameter]
+ * </p>
+ *
+ * @author ${author}
+ * @since ${date}
+ */
+#if(${entityLombokModel})
+@Data
+@EqualsAndHashCode(callSuper = true)
+#end
+#set($newClassName="$entity$parameter")
+public class ${newClassName} extends BaseMerchantParam{
+## ----------  BEGIN 字段循环遍历  ----------
+#foreach($field in ${table.fields})
+#if( (($field.propertyName != 'mchId'
+&& $field.propertyName != 'deleteFlag'
+&& $field.propertyName != 'updateTime'
+&& $field.propertyName != 'createTime'
+&& $field.propertyName != 'mchName'
+&& $field.propertyName != 'createBy'
+&& $field.propertyName != 'provinceId'
+&& $field.propertyName != 'cityId'
+&& $field.propertyName != 'countyId'
+)
+&&  $field.propertyName.indexOf("audit",0) == -1 ) &&  $field.comment.matches(".*\[i_update\].*") == false )
+#if(${field.keyFlag})
+#set($keyPropertyName=${field.propertyName})
+#end
+#if("$!field.comment" != "" && $field.comment.matches(".*\[i_update\].*") == false)
+    #set($comment="$field.comment.replaceAll('\[\w*\]', '')")
+    /**
+    * ${comment}
+    */
+    @ApiModelProperty(value = "${comment}")
+#end
+#if($field.propertyName == 'id' )
+    @NotNull(message = "主键id不能为空")
+#end
+    #if("$!field.comment" != "" && ($field.comment.matches(".*\[price\].*") == true))
+    @JsonDeserialize(using = PriceDeserialize.class)
+    #end
+    private ${field.propertyType} ${field.propertyName};
+
+#end
+#end
+## ----------  END 字段循环遍历  ----------
+
+#if(!${entityLombokModel})
+    #foreach($field in ${table.fields})
+#if(${field.propertyType.equals("boolean")})
+    #set($getprefix="is")
+#else
+    #set($getprefix="get")
+#end
+    public ${field.propertyType} ${getprefix}${field.capitalName}() {
+    return ${field.propertyName};
+    }
+
+#if(${entityBuilderModel})
+public ${entity} set${field.capitalName}(${field.propertyType} ${field.propertyName}) {
+#else
+public void set${field.capitalName}(${field.propertyType} ${field.propertyName}) {
+#end
+    this.${field.propertyName} = ${field.propertyName};
+#if(${entityBuilderModel})
+return this;
+#end
+    }
+    #end
+#end
+}

@@ -1,0 +1,77 @@
+#set($importListenerPackage=$package.Service.replace("service","excel"))
+#set($excelPackage=$package.Entity.replace("entity","excel"))
+#set($importListener="ImportListener")
+#set($excel="Excel")
+#set($all=".*")
+#set($newClassName="$entity$importListener")
+package $!{importListenerPackage};
+
+import com.alibaba.excel.context.AnalysisContext;
+import com.alibaba.excel.event.AnalysisEventListener;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
+import ${package.Service}.${table.serviceName};
+import ${excelPackage}${all};
+import ${package.Entity}.${entity};
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * $!{newClassName}
+ *
+ * @author hy
+ */
+@Data
+@RequiredArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+#set($excelModel="$entity$excel")
+public class $!{newClassName} extends AnalysisEventListener<$!{excelModel}> {
+
+    /**
+     * 默认每隔100条存储数据库
+     */
+    private int batchCount = 100;
+    /**
+     * 缓存的数据列表
+     */
+    private List<${entity}> list = new ArrayList<>();
+    /**
+     * 用户service
+     */
+    private final ${table.serviceName} importService;
+
+    /**
+    * 商户id
+    */
+    private final String mchId;
+
+    @Override
+    public void invoke(${excelModel} data, AnalysisContext context) {
+        list.add(this.convert(data));
+        // 达到BATCH_COUNT，则调用importer方法入库，防止数据几万条数据在内存，容易OOM
+        if (list.size() >= batchCount) {
+            // 调用importer方法
+            importService.saveBatch(list);
+            // 存储完成清理list
+            list.clear();
+        }
+    }
+
+    @Override
+    public void doAfterAllAnalysed(AnalysisContext analysisContext) {
+        // 调用importer方法
+        importService.saveBatch(list);
+        // 存储完成清理list
+        list.clear();
+    }
+
+    private ${entity} convert(${excelModel} excelModel){
+        ${entity} entity = new ${entity}();
+        BeanUtils.copyProperties(excelModel,entity);
+        entity.setMchId(mchId);
+        return entity;
+    }
+}

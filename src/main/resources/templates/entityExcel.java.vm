@@ -1,0 +1,71 @@
+#set($excelPackage=$package.Entity.replace("entity","excel"))
+#set($excel="Excel")
+package ${excelPackage};
+
+#if(${entityLombokModel})
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+#end
+import java.util.Date;
+import com.alibaba.excel.annotation.ExcelIgnore;
+import com.alibaba.excel.annotation.ExcelProperty;
+import com.alibaba.excel.annotation.write.style.ColumnWidth;
+import com.alibaba.excel.annotation.write.style.ContentRowHeight;
+import com.alibaba.excel.annotation.write.style.HeadRowHeight;
+
+/**
+ * <p>
+ * $!{table.comment}
+ * </p>
+ *
+ * @author ${author}
+ * @since ${date}
+ */
+#if(${entityLombokModel})
+@Data
+#end
+@ColumnWidth(25)
+@HeadRowHeight(20)
+@ContentRowHeight(18)
+#set($newClassName="$entity$excel")
+public class ${newClassName}{
+## ----------  BEGIN 字段循环遍历  ----------
+#foreach($field in ${table.fields})
+#if($field.propertyName != 'deleteFlag')
+#if(${field.keyFlag})
+#set($keyPropertyName=${field.propertyName})
+#end
+#if("$!field.comment" != "")
+#set($comment="$field.comment.replace('Q_','').replace('eq','').replace('like','').replace('between','').replace('gt','').replace('ge','').replace('lt','').replace('le','').replace('IM','')")
+    @ColumnWidth(15)
+    @ExcelProperty("${comment}")
+#end
+    private ${field.propertyType} ${field.propertyName};
+#end
+#end
+## ----------  END 字段循环遍历  ----------
+
+#if(!${entityLombokModel})
+    #foreach($field in ${table.fields})
+#if(${field.propertyType.equals("boolean")})
+    #set($getprefix="is")
+#else
+    #set($getprefix="get")
+#end
+    public ${field.propertyType} ${getprefix}${field.capitalName}() {
+    return ${field.propertyName};
+    }
+
+#if(${entityBuilderModel})
+public ${entity} set${field.capitalName}(${field.propertyType} ${field.propertyName}) {
+#else
+public void set${field.capitalName}(${field.propertyType} ${field.propertyName}) {
+#end
+    this.${field.propertyName} = ${field.propertyName};
+#if(${entityBuilderModel})
+return this;
+#end
+    }
+    #end
+#end
+}

@@ -1,0 +1,201 @@
+#set($importListenerPackage=$package.Service.replace("service","controller"))
+#set($excelPackage=$package.Entity.replace("entity","excel"))
+#set($excelDataPackage=$package.Service.replace("service","excel"))
+#set($paramPackage=$package.Entity.replace("entity","params"))
+#set($all=".*")
+#set($paramPage=$package.Entity)
+#set($controllerName="Controller")
+#set($newClassName="$entity$controllerName")
+package $!{importListenerPackage};
+
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.extension.service.additional.update.impl.LambdaUpdateChainWrapper;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.RestController;
+import javax.validation.Valid;
+import com.saas.common.annotation.SysLog;
+import java.util.Date;
+import com.saas.common.parameter.*;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+
+import ${package.Service}.${table.serviceName};
+import ${package.Entity}.${entity};
+import ${paramPackage}${all};
+
+/**
+ * <p>
+ * $!{table.comment} 前端控制器
+ * </p>
+ *
+ * @author ${author}
+ * @since ${date}
+ */
+@Api(tags = {"$!{table.comment.replace('表','')}-相关接口"})
+@Slf4j
+#if(${restControllerStyle})
+@RestController
+#else
+@Controller
+#end
+@RequestMapping("#if(${package.ModuleName})/${package.ModuleName}#end/#if(${controllerMappingHyphenStyle})${controllerMappingHyphen}#else${table.entityPath}#end")
+public class $!{newClassName}{
+    #set($serviceName = $table.serviceName.substring(0,1).toLowerCase()+$table.serviceName.substring(1))
+
+    @Autowired
+    private ${table.serviceName} ${serviceName};
+
+    /**
+    * 新增数据
+    */
+    @ApiOperation(value = "新增数据")
+    @PostMapping(value = "/add")
+    @RequiresPermissions("${entity.toLowerCase()}:add")
+    public R<${entity}> add(@RequestBody @Valid ${entity}AddParam param, HttpServletRequest request){
+        ${entity} entity = new ${entity}();
+        BeanUtil.copyProperties(param,entity);
+        entity.setCreateOperator(param.getLoginUserName());
+        return ${serviceName}.save(entity) ? R.success(entity) : R.error(BizResultEnum.FAILED);
+    }
+
+    /**
+    * 更新数据
+    */
+    @ApiOperation(value = "更新数据")
+    @PostMapping(value = "/update")
+    @RequiresPermissions("${entity.toLowerCase()}:update")
+    public R<${entity}> update(@RequestBody @Valid ${entity}UpdateParam param, HttpServletRequest request){
+        ${entity} one = ${serviceName}.lambdaQuery().eq(${entity}::getSupplierId, param.getLoginSupplierId()).eq(${entity}::getId, param.getId()).one();
+        if (Objects.isNull(one)) {
+             return R.error(BizResultEnum.FAILED);
+        }
+        ${entity} entity = new ${entity}();
+        BeanUtil.copyProperties(param,entity);
+        entity.setId(param.getId());
+        entity.setUpdateOperator(param.getLoginUserName());
+        return ${serviceName}.updateById(entity) ? R.success(entity) : R.error(BizResultEnum.FAILED);
+    }
+
+    /**
+    * 删除数据
+    */
+    @ApiOperation(value = "删除数据")
+    @PostMapping(value = "/del")
+    @RequiresPermissions("${entity.toLowerCase()}:del")
+    public R<?> delete(@RequestBody BatchParam param, HttpServletRequest request){
+        if (param.getIds() == null || param.getIds().size() == 0) {
+             return R.error(BizResultEnum.MISSING_REQUIRED_PARAMS);
+        }
+        LambdaUpdateChainWrapper<${entity}> lambdaUpdate = ${serviceName}.lambdaUpdate()
+            .set(${entity}::getDeleteFlag, DeleteFlagEnum.DELETE.getCode())
+            .set(${entity}::getUpdateOperator, param.getLoginUserName())
+            .eq(true,${entity}::getSupplierId,param.getLoginSupplierId())
+            .in(true,${entity}::getId, param.getIds());
+        return lambdaUpdate.update() ? R.success(BizResultEnum.SUCCESS) : R.error(BizResultEnum.FAILED);
+    }
+
+
+
+## ----------  BEGIN 字段循环遍历  ----------
+#foreach($field in ${table.fields})
+    #if($field.propertyName == 'auditStatus')
+    /**
+    * 审核通过
+    */
+    @ApiOperation(value = "审核通过")
+    @PostMapping(value = "/auditPass")
+    @RequiresPermissions("${entity.toLowerCase()}:audit")
+    public R<?> auditPass(@RequestBody AuditParam param, HttpServletRequest request){
+            LambdaUpdateChainWrapper<${entity}> lambdaUpdate = ${serviceName}.lambdaUpdate()
+            .set(${entity}::getAuditStatus, AuditStatusEnum.PASS_AUDIT.getCode())
+            .set(${entity}::getAuditUserId, param.getCreateBy())
+            .set(${entity}::getAuditUserName, param.getMchName())
+            .set(${entity}::getAuditTime, new Date())
+            .eq(true,${entity}::getMchId,param.getMchId())
+            .eq(${entity}::getId, param.getId());
+            return lambdaUpdate.update() ? R.success(BizResultEnum.SUCCESS) : R.error(BizResultEnum.FAILED);
+    }
+
+    /**
+    * 审核不通过
+    */
+    @ApiOperation(value = "审核不通过")
+    @PostMapping(value = "/auditFail")
+    @RequiresPermissions("${entity.toLowerCase()}:audit")
+    public R<?> auditFail(@RequestBody AuditParam param, HttpServletRequest request){
+            LambdaUpdateChainWrapper<${entity}> lambdaUpdate = ${serviceName}.lambdaUpdate()
+            .set(${entity}::getAuditStatus, AuditStatusEnum.FAIL_AUDIT.getCode())
+            .set(${entity}::getAuditUserId, param.getCreateBy())
+            .set(${entity}::getAuditUserName, param.getMchName())
+            .set(${entity}::getAuditRemark, param.getRemark())
+            .set(${entity}::getAuditTime, new Date())
+            .eq(true,${entity}::getMchId,param.getMchId())
+            .eq(${entity}::getId, param.getId());
+            return lambdaUpdate.update() ? R.success(BizResultEnum.SUCCESS) : R.error(BizResultEnum.FAILED);
+    }
+    #end
+    #if($field.propertyName == 'publishStatus')
+    /**
+    * 上架
+    */
+    @ApiOperation(value = "上架")
+    @PostMapping(value = "/on")
+    @RequiresPermissions("${entity.toLowerCase()}:publish")
+    public R<?> on(@RequestBody BatchParam param, HttpServletRequest request){
+            if (param.getIds() == null || param.getIds().size() == 0) {
+                return R.error(BizResultEnum.MISSING_REQUIRED_PARAMS);
+            }
+            LambdaUpdateChainWrapper<${entity}> lambdaUpdate = ${serviceName}.lambdaUpdate()
+            .set(${entity}::getPublishStatus, PublishStatusEnum.ON.getCode())
+            .eq(true,${entity}::getSupplierId,param.getLoginSupplierId())
+            .in(${entity}::getId, param.getIds());
+            return lambdaUpdate.update() ? R.success(BizResultEnum.SUCCESS) : R.error(BizResultEnum.FAILED);
+    }
+    /**
+    * 上架
+    */
+    @ApiOperation(value = "下架")
+    @PostMapping(value = "/off")
+    @RequiresPermissions("${entity.toLowerCase()}:publish")
+    public R<?> off(@RequestBody BatchParam param, HttpServletRequest request){
+            if (param.getIds() == null || param.getIds().size() == 0) {
+                return R.error(BizResultEnum.MISSING_REQUIRED_PARAMS);
+            }
+            LambdaUpdateChainWrapper<${entity}> lambdaUpdate = ${serviceName}.lambdaUpdate()
+            .set(${entity}::getPublishStatus, PublishStatusEnum.OFF.getCode())
+            .eq(true,${entity}::getSupplierId,param.getLoginSupplierId())
+            .in(${entity}::getId, param.getIds());
+            return lambdaUpdate.update() ? R.success(BizResultEnum.SUCCESS) : R.error(BizResultEnum.FAILED);
+   }
+    #end
+#end
+## ----------  END 字段循环遍历  ----------
+
+    /**
+    * 根据id查询
+    */
+    @ApiOperation(value = "根据id查询数据")
+    @GetMapping(value = "/getById")
+    @RequiresPermissions("${entity.toLowerCase()}:view")
+    public R<${entity}> getById(SingleParam param, HttpServletRequest request){
+        if(Objects.isNull(param.getId())){
+            return R.error(BizResultEnum.MISSING_REQUIRED_PARAMS);
+        }
+        return R.success(${serviceName}.getById(param.getId()));
+    }
+
+    /**
+    * 分页查询
+    */
+    @ApiOperation(value = "分页查询")
+    @GetMapping(value = "/page")
+    @RequiresPermissions("${entity.toLowerCase()}:view")
+    public R<IPage<${entity}>> page(${entity}PageParam param, HttpServletRequest request){
+        return R.success(${serviceName}.paginateByParam(param));
+    }
+}

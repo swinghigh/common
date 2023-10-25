@@ -1,0 +1,139 @@
+#set($parameterPackage=$package.Entity.replace("entity","params"))
+#set($parameter="PageParam")
+#set($parameterParam=$package.Controller.replace("controller","params.MerchantPageParam"))
+package ${parameterPackage};
+
+import ${package.Entity}.${entity};
+#if(${entityLombokModel})
+import ${parameterParam};
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import io.swagger.annotations.ApiModelProperty;
+import java.util.Date;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+#end
+
+/**
+ * <p>
+ * $!{table.comment}
+ * </p>
+ *
+ * @author ${author}
+ * @since ${date}
+ */
+#if(${entityLombokModel})
+@Data
+@EqualsAndHashCode(callSuper = true)
+#end
+#set($newClassName="$entity$parameter")
+public class ${newClassName} extends MerchantPageParam<$entity>{
+
+## ----------  BEGIN 字段循环遍历  ----------
+#foreach($field in ${table.fields})
+#if($field.comment!= '' && ($field.comment.matches(".*\[q_\w*\].*")
+))
+    #set($comment="$field.comment.replaceAll('\[\w*\]', '')")
+#if(${field.keyFlag})
+#set($keyPropertyName=${field.propertyName})
+#end
+#if($field.comment.indexOf("between") != -1)
+    #set($start="Start")
+    #set($end="End")
+    #set($startComment="开始")
+    #set($endComment="结束")
+    #if("$!field.comment" != "")
+@ApiModelProperty(value = "${comment}${startComment}")
+    #end
+private ${field.propertyType} ${field.propertyName}${start};
+
+    #if("$!field.comment" != "")
+@ApiModelProperty(value = "${comment}${endComment}")
+    #end
+private ${field.propertyType} ${field.propertyName}${end};
+
+#else
+    #if("$!field.comment" != "")
+@ApiModelProperty(value = "${comment}")
+    #end
+private ${field.propertyType} ${field.propertyName};
+
+#end
+#end
+#end
+## ----------  END 字段循环遍历  ----------
+
+#if(!${entityLombokModel})
+    #foreach($field in ${table.fields})
+#if(${field.propertyType.equals("boolean")})
+    #set($getprefix="is")
+#else
+    #set($getprefix="get")
+#end
+    public ${field.propertyType} ${getprefix}${field.capitalName}() {
+    return ${field.propertyName};
+    }
+
+#if(${entityBuilderModel})
+public ${entity} set${field.capitalName}(${field.propertyType} ${field.propertyName}) {
+#else
+public void set${field.capitalName}(${field.propertyType} ${field.propertyName}) {
+#end
+    this.${field.propertyName} = ${field.propertyName};
+#if(${entityBuilderModel})
+return this;
+#end
+    }
+    #end
+#end
+    @Override
+    public LambdaQueryWrapper<${entity}> toQueryWrapper() {
+        LambdaQueryWrapper<${entity}> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.select(${entity}.class, t -> !t.getColumn().endsWith("_editor")
+#foreach($field in ${table.fields})
+#if($field.comment.matches(".*\[i_list\].*"))
+                && !t.getColumn().equalsIgnoreCase(${entity}.${field.name.toUpperCase()})
+#end
+#end
+        );
+## ----------  BEGIN 字段循环遍历  ----------
+#foreach($field in ${table.fields})
+#if($field.propertyName == 'mchId')
+queryWrapper.eq(!StrUtil.isBlankOrUndefined(getMchId()), ${entity}::getMchId, getMchId());
+#end
+#if($field.comment!= '')
+#if($field.propertyType == 'String')
+#set($checkerFun="!StrUtil.isBlankOrUndefined")
+#end
+#if($field.propertyType == 'Long' || $field.propertyType == 'Integer'|| $field.propertyType == 'Date')
+#set($checkerFun="Objects.nonNull")
+#end
+#if($field.comment.indexOf("[q_eq]") != -1)
+        queryWrapper.eq(${checkerFun}(${field.propertyName}), ${entity}::get${field.capitalName}, ${field.propertyName});
+#end
+#if($field.comment.indexOf("[q_like]") != -1)
+        queryWrapper.like(${checkerFun}(${field.propertyName}), ${entity}::get${field.capitalName}, ${field.propertyName});
+#end
+#if($field.comment.indexOf("[q_gt]") != -1)
+        queryWrapper.gt(${checkerFun}(${field.propertyName}), ${entity}::get${field.capitalName}, ${field.propertyName});
+#end
+#if($field.comment.indexOf("[q_ge]") != -1)
+        queryWrapper.ge(${checkerFun}(${field.propertyName}), ${entity}::get${field.capitalName}, ${field.propertyName});
+#end
+#if($field.comment.indexOf("[q_lt]") != -1)
+        queryWrapper.lt(${checkerFun}(${field.propertyName}), ${entity}::get${field.capitalName}, ${field.propertyName});
+#end
+#if($field.comment.indexOf("[q_le]") != -1)
+        queryWrapper.le(${checkerFun}(${field.propertyName}), ${entity}::get${field.capitalName}, ${field.propertyName});
+#end
+#if($field.comment.indexOf("[q_between]") != -1)
+    #set($start="Start")
+    #set($end="End")
+        queryWrapper.between(${checkerFun}(${field.propertyName}${start}) && ${checkerFun}(${field.propertyName}${end}), ${entity}::get${field.capitalName}, ${field.propertyName}${start},${field.propertyName}${end});
+#end
+#end
+#end
+## ----------  END 字段循环遍历  ----------
+        return queryWrapper;
+    }
+}
